@@ -4,6 +4,13 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 const legacyFile = path.resolve(process.cwd(), '../public/index.html');
+const candidateBridgeFile = path.resolve(process.cwd(), 'src/legacyCandidateBridge.js');
+
+function getLegacyHtml() {
+  const html = fs.readFileSync(legacyFile, 'utf8');
+  const bridge = fs.readFileSync(candidateBridgeFile, 'utf8');
+  return html.replace('</body>', `<script>${bridge}</script>\n</body>`);
+}
 
 function legacyFrontendPlugin() {
   return {
@@ -12,14 +19,14 @@ function legacyFrontendPlugin() {
       server.middlewares.use('/legacy.html', (_req, res) => {
         res.statusCode = 200;
         res.setHeader('Content-Type', 'text/html; charset=utf-8');
-        res.end(fs.readFileSync(legacyFile, 'utf8'));
+        res.end(getLegacyHtml());
       });
     },
     generateBundle() {
       this.emitFile({
         type: 'asset',
         fileName: 'legacy.html',
-        source: fs.readFileSync(legacyFile, 'utf8')
+        source: getLegacyHtml()
       });
     }
   };
