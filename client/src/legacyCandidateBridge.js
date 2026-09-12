@@ -1,4 +1,108 @@
 (function () {
+  // These instructor auth handlers live inside the legacy iframe as a fallback.
+  // This makes the Create Account and Login buttons work even if the parent
+  // React bridge has not attached yet.
+  const authApi = async (path, options = {}) => {
+    const response = await fetch('/api' + path, {
+      ...options,
+      headers: { 'Content-Type': 'application/json', ...(options.headers || {}) }
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(data.message || data.error || 'Request failed.');
+    return data;
+  };
+
+  const authToast = (message) => {
+    if (typeof window.toast === 'function') window.toast(message);
+    else alert(message);
+  };
+
+  window.registerDemo = async function () {
+    const fullName = document.getElementById('regName')?.value?.trim();
+    const phone = document.getElementById('regPhone')?.value?.trim();
+    const email = document.getElementById('regEmail')?.value?.trim();
+    const password = document.getElementById('regPassword')?.value || '';
+    const confirmPassword = document.getElementById('regConfirm')?.value || '';
+
+    if (!fullName || !phone || !email || !password || !confirmPassword) {
+      return authToast('Complete all required fields.');
+    }
+    if (!/^\d{11}$/.test(phone)) {
+      return authToast('Phone number must contain exactly 11 digits.');
+    }
+    if (password.length < 8) {
+      return authToast('Password must be at least 8 characters.');
+    }
+    if (password !== confirmPassword) {
+      return authToast('Passwords do not match.');
+    }
+
+    const button = document.querySelector('#registerForm button.btn-primary');
+    if (button) {
+      button.disabled = true;
+      button.textContent = 'Creating Account...';
+    }
+
+    try {
+      const data = await authApi('/auth/register', {
+        method: 'POST',
+        body: JSON.stringify({ fullName, phone, email, password })
+      });
+
+      let message = data.message || 'Account created successfully.';
+      if (data.developmentVerificationToken) {
+        message += ` Development verification token: ${data.developmentVerificationToken}`;
+      }
+      authToast(message);
+
+      if (typeof window.showAuth === 'function') {
+        window.showAuth('loginForm');
+      }
+    } catch (error) {
+      authToast(error.message);
+    } finally {
+      if (button) {
+        button.disabled = false;
+        button.textContent = 'Create Instructor Account';
+      }
+    }
+  };
+
+  window.loginDemo = async function () {
+    const email = document.getElementById('loginEmail')?.value?.trim();
+    const password = document.getElementById('loginPassword')?.value || '';
+    if (!email || !password) return authToast('Enter your email address and password.');
+
+    const button = document.querySelector('#loginForm button.btn-primary');
+    if (button) {
+      button.disabled = true;
+      button.textContent = 'Logging in...';
+    }
+
+    try {
+      const data = await authApi('/auth/login', {
+        method: 'POST',
+        body: JSON.stringify({ email, password })
+      });
+      localStorage.setItem('grateful_edutech_token', data.token);
+      localStorage.setItem('grateful_edutech_user', JSON.stringify(data.user));
+
+      const login = document.getElementById('login');
+      const instructorApp = document.getElementById('instructorApp');
+      if (login) login.style.display = 'none';
+      if (instructorApp) instructorApp.style.display = 'flex';
+      if (typeof window.showPage === 'function') window.showPage('dashboard');
+      authToast('Login successful.');
+    } catch (error) {
+      authToast(error.message);
+    } finally {
+      if (button) {
+        button.disabled = false;
+        button.textContent = 'Login';
+      }
+    }
+  };
+
   const params = new URLSearchParams(window.top && window.top.location ? window.top.location.search : window.location.search);
   const testSlug = params.get('test');
   if (!testSlug) return;
