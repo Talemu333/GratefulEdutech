@@ -1,7 +1,18 @@
 (function () {
-  // These instructor auth handlers live inside the legacy iframe as a fallback.
-  // This makes the Create Account and Login buttons work even if the parent
-  // React bridge has not attached yet.
+  // Keep the original frontend unchanged, but make the auth tab actions
+  // available reliably when the page is running inside the React iframe.
+  window.showAuth = function (formId) {
+    const loginForm = document.getElementById('loginForm');
+    const registerForm = document.getElementById('registerForm');
+    const loginTab = document.getElementById('loginTab');
+    const registerTab = document.getElementById('registerTab');
+
+    if (loginForm) loginForm.style.display = formId === 'loginForm' ? 'grid' : 'none';
+    if (registerForm) registerForm.style.display = formId === 'registerForm' ? 'grid' : 'none';
+    if (loginTab) loginTab.classList.toggle('active', formId === 'loginForm');
+    if (registerTab) registerTab.classList.toggle('active', formId === 'registerForm');
+  };
+
   const authApi = async (path, options = {}) => {
     const response = await fetch('/api' + path, {
       ...options,
@@ -54,10 +65,7 @@
         message += ` Development verification token: ${data.developmentVerificationToken}`;
       }
       authToast(message);
-
-      if (typeof window.showAuth === 'function') {
-        window.showAuth('loginForm');
-      }
+      window.showAuth('loginForm');
     } catch (error) {
       authToast(error.message);
     } finally {
